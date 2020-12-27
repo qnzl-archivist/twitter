@@ -2,13 +2,14 @@ const Vogel = require(`vogel`)
 
 const {
   TWITTER_CONSUMER_KEY,
-  TWITTER_CONSUMER_SECRET
+  TWITTER_CONSUMER_SECRET,
+  TWITTER_OAUTH_CALLBACK,
 } = process.env
 
 const twitter = new Vogel({
   consumerKey: TWITTER_CONSUMER_KEY,
   consumerSecret: TWITTER_CONSUMER_SECRET,
-  oauthCallback: 'http://ceb0ba2d7792.ngrok.io/api/oauth-callback'
+  oauthCallback: TWITTER_OAUTH_CALLBACK,
 })
 
 module.exports = async (req, res, next) => {
