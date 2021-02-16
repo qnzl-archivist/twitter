@@ -10,9 +10,10 @@
   "license": "MIT",
   "dependencies": {
     "dayjs": "^1.9.6",
+    "node-fetch": "^2.6.1",
     "twitter": "^1.7.1",
     "twitter-lite": "^0.14.0",
     "twitter-v2": "^1.0.0",
-    "vogel": "0.0.6"
+    "vogel": "0.0.7"
   }
 }

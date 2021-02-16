@@ -92,9 +92,11 @@ module.exports = async (req, res, next) => {
   }
 
   const {
-    latestId
+    latestId,
+    scope,
   } = req.query
 
+  console.log("CONSUMER:", accessToken, accessTokenSecret)
   const twitter = new Vogel({
     consumerKey: TWITTER_CONSUMER_KEY,
     consumerSecret: TWITTER_CONSUMER_SECRET,
@@ -115,6 +117,49 @@ module.exports = async (req, res, next) => {
     // User is authenticated through `accessToken` and `accessTokenSecret`
     // passed through Authorization header
     const tlReq = await twitter.get(`/1.1/statuses/home_timeline.json`, {
+      query
+    })
+
+    const statuses = await tlReq.json()
+
+    console.log("STATUSES: ", statuses)
+    if (statuses.errors) {
+      return tweets
+    }
+
+    let rateLimitRemaining = tlReq.headers.get('x-rate-limit-remaining')
+
+    console.log(`Got ${statuses.length} tweets`)
+
+    // Keep track of the oldest ID so we can retrieve more if needed
+    const lastStatus = statuses.slice(-1)[0]
+    if (maxId === lastStatus.id) {
+      console.warn(`got the same max id we had last time, stopping iteration`)
+
+      rateLimitRemaining = 0
+    }
+
+    maxId = lastStatus.id
+
+    tweets.push(...statuses)
+
+    // We want to try to use up the rate limit, pulling up as much as possible
+    if (Number(rateLimitRemaining) > 0) {
+      return tweets
+    } else {
+      return tweets
+    }
+  }
+
+  const getPersonalTweets = async (tweets = [], maxId = ``) => {
+    console.log(`get timeline: ${tweets.length} / ${maxId}`)
+
+    const query = {
+      // TODO Change to 200 before release
+      count: 10
+    }
+
+    const tlReq = await twitter.get(`/1.1/statuses/user_timeline.json`, {
       query
     })
 
@@ -148,17 +193,28 @@ module.exports = async (req, res, next) => {
     }
   }
 
-  let updates = await getTimeline([], latestId)
+  let entities
+  if (scope === `timeline`) {
+    console.log(`get timeline`)
+    entities = await getTimeline([], latestId)
+  } else if (scope === `personal`) {
+    console.log(`get personal`)
+    entities = await getPersonalTweets([], latestId)
+  } else {
+    console.log(`get both`)
+    const timeline = await getTimeline([], latestId)
+    entities = await getPersonalTweets(timeline, latestId)
+  }
 
-  updates = updates.map((update) => {
-    update.id = update.id_str
+  entities = entities.map((tweet) => {
+    tweet.id = tweet.id_str
 
-    return update
+    return tweet
   })
 
-  updates = await hydrateTweets(updates, twitter)
+  entities = await hydrateTweets(entities, twitter)
 
   return res.json({
-    entities: updates,
+    entities,
   })
 }
