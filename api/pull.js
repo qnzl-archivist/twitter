@@ -96,7 +96,8 @@ module.exports = async (req, res, next) => {
     scope,
   } = req.query
 
-  console.log("CONSUMER:", accessToken, accessTokenSecret)
+  const scopes = scope.split(`,`)
+
   const twitter = new Vogel({
     consumerKey: TWITTER_CONSUMER_KEY,
     consumerSecret: TWITTER_CONSUMER_SECRET,
@@ -122,7 +123,6 @@ module.exports = async (req, res, next) => {
 
     const statuses = await tlReq.json()
 
-    console.log("STATUSES: ", statuses)
     if (statuses.errors) {
       return tweets
     }
@@ -193,28 +193,81 @@ module.exports = async (req, res, next) => {
     }
   }
 
-  let entities
-  if (scope === `timeline`) {
-    console.log(`get timeline`)
-    entities = await getTimeline([], latestId)
-  } else if (scope === `personal`) {
-    console.log(`get personal`)
-    entities = await getPersonalTweets([], latestId)
-  } else {
-    console.log(`get both`)
-    const timeline = await getTimeline([], latestId)
-    entities = await getPersonalTweets(timeline, latestId)
+  const getLikedTweets = async (tweets = [], maxId = ``) => {
+    console.log(`get timeline: ${tweets.length} / ${maxId}`)
+
+    const query = {
+      // TODO Change to 200 before release
+      count: 10
+    }
+
+
+    const tlReq = await twitter.get(`/1.1/favorites/list.json`, {
+      query
+    })
+
+    const statuses = await tlReq.json()
+
+    if (statuses.errors) {
+      return tweets
+    }
+
+    let rateLimitRemaining = tlReq.headers.get('x-rate-limit-remaining')
+
+    console.log(`Got ${statuses.length} tweets`)
+
+    // Keep track of the oldest ID so we can retrieve more if needed
+    const lastStatus = statuses.slice(-1)[0]
+    if (maxId === lastStatus.id) {
+      console.warn(`got the same max id we had last time, stopping iteration`)
+
+      rateLimitRemaining = 0
+    }
+
+    maxId = lastStatus.id
+
+    tweets.push(...statuses)
+
+    // We want to try to use up the rate limit, pulling up as much as possible
+    if (Number(rateLimitRemaining) > 0) {
+      return tweets
+    } else {
+      return tweets
+    }
   }
 
-  entities = entities.map((tweet) => {
-    tweet.id = tweet.id_str
+  const scopedPromises = scopes.map(async (scope) => {
+    let entities
+    if (scope === `timeline`) {
+      console.log(`get timeline`)
+      entities = await getTimeline([], latestId)
+    } else if (scope === `personal`) {
+      console.log(`get personal`)
+      entities = await getPersonalTweets([], latestId)
+    } else if (scope === `likes`) {
+      entities = await getLikedTweets([], latestId)
+    } else {
+      console.log(`get both`)
+      const timeline = await getTimeline([], latestId)
+      entities = await getPersonalTweets(timeline, latestId)
+    }
 
-    return tweet
+    entities = entities.map((tweet) => {
+      tweet.id = tweet.id_str
+
+      return tweet
+    })
+
+    entities = await hydrateTweets(entities, twitter)
+
+    return { [scope]: entities }
   })
 
-  entities = await hydrateTweets(entities, twitter)
+  const scopedEntities = await Promise.all(scopedPromises)
+
+  const mergedEntities = Object.assign({}, ...scopedEntities)
 
   return res.json({
-    entities,
+    entities: mergedEntities,
   })
 }
