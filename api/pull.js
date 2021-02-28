@@ -78,6 +78,7 @@ const hydrateTweets = async (updates, twitter) => {
   })
 }
 
+
 module.exports = async (req, res, next) => {
   const [ type, auth ] = req.headers[`authorization`].split(` `)
 
@@ -109,8 +110,7 @@ module.exports = async (req, res, next) => {
     console.log(`get timeline: ${tweets.length} / ${maxId}`)
 
     const query = {
-      // TODO Change to 200 before release
-      count: 10,
+      count: 200,
     }
 
     // Gets tweets from authenticated user
@@ -145,7 +145,7 @@ module.exports = async (req, res, next) => {
 
     // We want to try to use up the rate limit, pulling up as much as possible
     if (Number(rateLimitRemaining) > 0) {
-      return tweets
+      return getTimeline(tweets, maxId)
     } else {
       return tweets
     }
@@ -155,9 +155,9 @@ module.exports = async (req, res, next) => {
     console.log(`get timeline: ${tweets.length} / ${maxId}`)
 
     const query = {
-      // TODO Change to 200 before release
-      count: 10
+      count: 200
     }
+
 
     const tlReq = await twitter.get(`/1.1/statuses/user_timeline.json`, {
       query
@@ -187,7 +187,7 @@ module.exports = async (req, res, next) => {
 
     // We want to try to use up the rate limit, pulling up as much as possible
     if (Number(rateLimitRemaining) > 0) {
-      return tweets
+      return getPersonalTweets(tweets, maxId)
     } else {
       return tweets
     }
@@ -197,8 +197,7 @@ module.exports = async (req, res, next) => {
     console.log(`get timeline: ${tweets.length} / ${maxId}`)
 
     const query = {
-      // TODO Change to 200 before release
-      count: 10
+      count: 200
     }
 
 
@@ -230,7 +229,7 @@ module.exports = async (req, res, next) => {
 
     // We want to try to use up the rate limit, pulling up as much as possible
     if (Number(rateLimitRemaining) > 0) {
-      return tweets
+      return getLikedTweets(tweets, maxId)
     } else {
       return tweets
     }
