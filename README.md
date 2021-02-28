@@ -1,4 +1,4 @@
-## @takeamos/jobs/twitter
+## twitter
 
 ### Wishlist
 
